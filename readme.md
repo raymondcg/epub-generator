@@ -18,7 +18,7 @@ CHAPTERS_PER_VOLUME=1000
 
 2. Place each book as `{BOOK_DB}/{id}.json` with a matching cover `{BOOK_DB}/{id}.jpg`.
 
-Optional JSON field `lastUpdated` (`YYYY-MM-DD`): if present and older than an existing EPUB’s file date, that volume is skipped. If omitted, it defaults to today (so an existing EPUB from an earlier day is recreated).
+Optional JSON field `lastUpdated` (`YYYY-MM-DD`): if present and on or before an existing EPUB’s last-modified date, that volume is skipped (EpubCheck still runs). If omitted, it defaults to today. Recreate only when `lastUpdated` is after the EPUB’s last-modified date.
 
 ## Build
 
@@ -29,13 +29,7 @@ mvn --batch-mode --errors --fail-at-end --show-version clean install
 ## Run
 
 ```bash
-mvn -pl epub-generator spring-boot:run
-```
-
-Or after build:
-
-```bash
-java -jar epub-generator/target/epub-generator-1.0-SNAPSHOT-exec.jar
+java -jar epub-generator/target/epub-generator.jar
 ```
 
 The app loads `.env`, reads every `*.json` under `BOOK_DB`, and writes EPUB files to `EPUB_OUTPUT`. After all volumes finish, it prints a consolidated EpubCheck summary (fatal/error/warning totals and a reprint of every issue).

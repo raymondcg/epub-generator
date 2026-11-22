@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
@@ -170,18 +171,39 @@ public class GeneratorTest {
         assertEquals( before, Files.getLastModifiedTime( epubPath ) );
     }
 
-    @DisplayName("recreates when lastUpdated is missing (defaults to today)")
+    @DisplayName("skips recreate when lastUpdated is missing and EPUB is from today")
     @Test
-    public void recreatesWhenLastUpdatedMissingDefaultsToToday() throws Exception {
+    public void skipsWhenLastUpdatedMissingAndEpubIsToday() throws Exception {
         Book book = loadSampleBook();
         copyCoverToBookDb();
-        book.setLastUpdated( LocalDate.now().minusDays( 1 ) );
 
         generatorService.generate( book );
 
         Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
         FileTime before = Files.getLastModifiedTime( epubPath );
-        Thread.sleep( 1100 );
+
+        book.setLastUpdated( null );
+        List<CustomReport> reports = generatorService.generate( book );
+
+        assertEquals( 1, reports.size() );
+        assertReportClean( reports.get( 0 ) );
+        assertTrue( reports.get( 0 ).getCollectedMessages().isEmpty() );
+        assertEquals( before, Files.getLastModifiedTime( epubPath ) );
+    }
+
+    @DisplayName("recreates when lastUpdated defaults to today and EPUB mtime is older")
+    @Test
+    public void recreatesWhenLastUpdatedMissingAndEpubIsOlder() throws Exception {
+        Book book = loadSampleBook();
+        copyCoverToBookDb();
+
+        generatorService.generate( book );
+
+        Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
+        FileTime older = FileTime.from( LocalDate.now().minusDays( 2 ).atStartOfDay( ZoneId.systemDefault() )
+                .toInstant() );
+        Files.setLastModifiedTime( epubPath, older );
+        FileTime before = Files.getLastModifiedTime( epubPath );
 
         book.setLastUpdated( null );
         List<CustomReport> reports = generatorService.generate( book );
