@@ -1,5 +1,9 @@
 package org.webnerdbot.generator;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -22,6 +26,8 @@ public class CustomReport extends MasterReport {
 
     public static String ePubVersion;
 
+    private final List<String> collectedMessages = new ArrayList<>();
+
     public CustomReport( String ePubName ) {
         this( ePubName, null, false );
     }
@@ -33,6 +39,13 @@ public class CustomReport extends MasterReport {
         if ( info != null ) {
             // warning("", 0, 0, info);
         }
+    }
+
+    /**
+     * FATAL / ERROR / WARNING messages collected during EpubCheck (for end-of-run reprint).
+     */
+    public List<String> getCollectedMessages() {
+        return Collections.unmodifiableList( collectedMessages );
     }
 
     String fixMessage( String message ) {
@@ -56,6 +69,10 @@ public class CustomReport extends MasterReport {
     public void message( Message message, EPUBLocation location, Object... args ) {
         Severity severity = message.getSeverity();
         String text = formatMessage( message, location, args );
+        if ( severity.equals( Severity.FATAL ) || severity.equals( Severity.ERROR )
+                || severity.equals( Severity.WARNING ) ) {
+            collectedMessages.add( text );
+        }
         if ( severity.equals( Severity.USAGE ) ) {
             pushQuiet();
             LOGGER.info( text );

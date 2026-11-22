@@ -10,13 +10,18 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +70,18 @@ public class GeneratorTest {
         registry.add( "BOOK_DB", () -> BOOK_DB_DIR.toAbsolutePath().toString() );
         registry.add( "EPUB_OUTPUT", () -> EPUB_DIR.toAbsolutePath().toString() );
         registry.add( "CHAPTERS_PER_VOLUME", () -> "1000" );
+    }
+
+    @BeforeEach
+    void clearEpubOutput() throws IOException {
+        if ( !Files.isDirectory( EPUB_DIR ) ) {
+            return;
+        }
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream( EPUB_DIR )) {
+            for ( Path entry : stream ) {
+                deleteRecursively( entry );
+            }
+        }
     }
 
     @DisplayName("generate happy path produces a valid EPUB")
@@ -134,6 +151,62 @@ public class GeneratorTest {
         assertEquals( 1, generatorService.go() );
     }
 
+    @DisplayName("skips recreate when lastUpdated is older than existing EPUB date")
+    @Test
+    public void skipsWhenLastUpdatedOlderThanEpub() throws Exception {
+        Book book = loadSampleBook();
+        copyCoverToBookDb();
+
+        generatorService.generate( book );
+
+        Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
+        FileTime before = Files.getLastModifiedTime( epubPath );
+
+        book.setLastUpdated( LocalDate.now().minusDays( 1 ) );
+        List<CustomReport> reports = generatorService.generate( book );
+
+        assertEquals( 1, reports.size() );
+        assertReportClean( reports.get( 0 ) );
+        assertEquals( before, Files.getLastModifiedTime( epubPath ) );
+    }
+
+    @DisplayName("recreates when lastUpdated is missing (defaults to today)")
+    @Test
+    public void recreatesWhenLastUpdatedMissingDefaultsToToday() throws Exception {
+        Book book = loadSampleBook();
+        copyCoverToBookDb();
+        book.setLastUpdated( LocalDate.now().minusDays( 1 ) );
+
+        generatorService.generate( book );
+
+        Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
+        FileTime before = Files.getLastModifiedTime( epubPath );
+        Thread.sleep( 1100 );
+
+        book.setLastUpdated( null );
+        List<CustomReport> reports = generatorService.generate( book );
+
+        assertEquals( 1, reports.size() );
+        assertReportClean( reports.get( 0 ) );
+        assertTrue( Files.getLastModifiedTime( epubPath ).compareTo( before ) > 0 );
+    }
+
+    @DisplayName("go summary path returns clean reports with zero collected issues")
+    @Test
+    public void goSummaryHasCleanReports() throws Exception {
+        copySampleJsonToBookDb();
+        copyCoverToBookDb();
+
+        assertEquals( 0, generatorService.go() );
+
+        Book book = loadSampleBook();
+        book.setLastUpdated( LocalDate.now().minusDays( 1 ) );
+        List<CustomReport> reports = generatorService.generate( book );
+        assertEquals( 1, reports.size() );
+        assertReportClean( reports.get( 0 ) );
+        assertTrue( reports.get( 0 ).getCollectedMessages().isEmpty() );
+    }
+
     private GeneratorService createServiceWithChaptersPerVolume( int chaptersPerVolume ) throws Exception {
         ApplicationProperties props = new ApplicationProperties();
         setField( props, "bookDb", BOOK_DB_DIR.toAbsolutePath().toString() );
@@ -155,6 +228,17 @@ public class GeneratorTest {
         Field field = target.getClass().getDeclaredField( name );
         field.setAccessible( true );
         field.set( target, value );
+    }
+
+    private static void deleteRecursively( Path path ) throws IOException {
+        if ( Files.isDirectory( path ) ) {
+            try (Stream<Path> children = Files.list( path )) {
+                for ( Path child : children.toList() ) {
+                    deleteRecursively( child );
+                }
+            }
+        }
+        Files.deleteIfExists( path );
     }
 
     private Book loadSampleBook() throws IOException {

@@ -18,6 +18,8 @@ CHAPTERS_PER_VOLUME=1000
 
 2. Place each book as `{BOOK_DB}/{id}.json` with a matching cover `{BOOK_DB}/{id}.jpg`.
 
+Optional JSON field `lastUpdated` (`YYYY-MM-DD`): if present and older than an existing EPUB’s file date, that volume is skipped. If omitted, it defaults to today (so an existing EPUB from an earlier day is recreated).
+
 ## Build
 
 ```bash
@@ -36,4 +38,4 @@ Or after build:
 java -jar epub-generator/target/epub-generator-1.0-SNAPSHOT-exec.jar
 ```
 
-The app loads `.env`, reads every `*.json` under `BOOK_DB`, and writes EPUB files to `EPUB_OUTPUT`.
+The app loads `.env`, reads every `*.json` under `BOOK_DB`, and writes EPUB files to `EPUB_OUTPUT`. After all volumes finish, it prints a consolidated EpubCheck summary (fatal/error/warning totals and a reprint of every issue).
