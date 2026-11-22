@@ -1,0 +1,14 @@
+html, body, div, h1, h2, h3, h4, h5, h6, ul, ol, dl, li, dt, dd, p, pre, table, th, td, tr { 
+    margin: 0; 
+    padding: 0; 
+}
+p + p {
+    margin-top: 0.5em; 
+}
+p.chapter {
+    text-indent: 1.5em;
+    font-weight: bold;
+    font-size: 2em;
+    margin-top:5em;
+    margin-bottom:2em;
+}

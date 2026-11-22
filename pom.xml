@@ -1,0 +1,157 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="
+		http://maven.apache.org/POM/4.0.0 
+		http://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <modelVersion>4.0.0</modelVersion>
+   <packaging>pom</packaging>
+
+   <groupId>org.webnerdbot</groupId>
+   <artifactId>epub-generator-build</artifactId>
+   <version>1.0-SNAPSHOT</version>
+
+   <name>epub-generator-build</name>
+   <description>Project to create epubs from json files.</description>
+   <inceptionYear>2019</inceptionYear>
+
+   <modules>
+      <module>epub-generator-bom</module>
+      <module>epub-generator</module>
+   </modules>
+
+   <properties>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+      <!-- Maven Plugins -->
+      <compiler.plugin.version>3.8.0</compiler.plugin.version>
+      <java.version>17</java.version>
+      <formatter.plugin.version>0.5.2</formatter.plugin.version>
+      <resources.plugin.version>2.7</resources.plugin.version>
+
+   </properties>
+
+   <build>
+      <!-- These plugins are here so that encoding for the entire project is set to UTF-8, and to ensure that all items are 
+         properly formatted. -->
+      <pluginManagement>
+         <plugins>
+            <!-- Compiles to a specific java version. -->
+            <plugin>
+               <groupId>org.apache.maven.plugins</groupId>
+               <artifactId>maven-compiler-plugin</artifactId>
+               <version>${compiler.plugin.version}</version>
+               <configuration>
+                  <compilerId>javac</compilerId>
+                  <source>${java.version}</source>
+                  <target>${java.version}</target>
+                  <compilerVersion>${java.version}</compilerVersion>
+                  <encoding>UTF-8</encoding>
+               </configuration>
+            </plugin>
+
+            <!-- Code Formatting, on 'clean' goal -->
+            <plugin>
+               <groupId>net.revelc.code</groupId>
+               <artifactId>formatter-maven-plugin</artifactId>
+               <version>${formatter.plugin.version}</version>
+               <executions>
+                  <execution>
+                     <!-- Binding to clean phase because M2E doesn't work correctly for this plugin. -->
+                     <phase>clean</phase>
+                     <goals>
+                        <goal>format</goal>
+                     </goals>
+                  </execution>
+               </executions>
+               <configuration>
+                  <configFile>${basedir}/../etc/eclipse/JavaCodeStyle.xml</configFile>
+                  <encoding>UTF-8</encoding>
+               </configuration>
+            </plugin>
+
+            <!-- To properly set encoding -->
+            <plugin>
+               <groupId>org.apache.maven.plugins</groupId>
+               <artifactId>maven-resources-plugin</artifactId>
+               <version>${resources.plugin.version}</version>
+               <configuration>
+                  <encoding>UTF-8</encoding>
+               </configuration>
+            </plugin>
+         </plugins>
+      </pluginManagement>
+      <plugins>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+         </plugin>
+         <!-- Code Formatting, on 'clean' goal -->
+         <plugin>
+            <groupId>net.revelc.code</groupId>
+            <artifactId>formatter-maven-plugin</artifactId>
+         </plugin>
+
+         <!-- To properly set encoding -->
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-resources-plugin</artifactId>
+         </plugin>
+      </plugins>
+   </build>
+
+   <licenses>
+      <license>
+         <name>Apache License, Version 2.0</name>
+         <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+         <distribution>repo</distribution>
+         <comments>A business-friendly OSS license</comments>
+      </license>
+   </licenses>
+
+   <organization>
+      <name>Codehaus Mojo</name>
+      <url>http://mojo.codehaus.org</url>
+   </organization>
+
+   <developers>
+      <developer>
+         <id>rgillett</id>
+         <name>Raymond Gillett</name>
+         <email>raymondcgillett@gmail.com</email>
+         <url></url>
+         <organization>Myself</organization>
+         <organizationUrl></organizationUrl>
+         <roles>
+            <role>architect</role>
+            <role>developer</role>
+         </roles>
+         <timezone>America/New_York</timezone>
+         <properties>
+            <picUrl></picUrl>
+         </properties>
+      </developer>
+   </developers>
+
+   <contributors>
+      <contributor>
+         <name>Raymond Gillett</name>
+         <email>raymondcgillett@gmail.com</email>
+         <url></url>
+         <organization>Myself</organization>
+         <organizationUrl></organizationUrl>
+         <roles>
+            <role>architect</role>
+            <role>developer</role>
+         </roles>
+         <timezone>America/Vancouver</timezone>
+         <properties>
+            <gtalk>raymondcgillett@gmail.com</gtalk>
+         </properties>
+      </contributor>
+   </contributors>
+
+   <issueManagement>
+      <system>GitHub</system>
+      <url>https://github.com/raymondcg/webnerdbot-services/issues</url>
+   </issueManagement>
+</project>

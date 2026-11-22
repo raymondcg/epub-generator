@@ -1,0 +1,21 @@
+# Eclipse
+.classpath
+.project
+.settings/
+*.launch
+
+# Visual Studio Code
+**/.factorypath
+
+#Maven
+log/
+target
+
+# Spring
+.springBeans
+
+# Application
+temp/**/*
+config/**/*
+**/.factorypath
+.env
