@@ -29,7 +29,8 @@ mvn --batch-mode --errors --fail-at-end --show-version clean install
 ## Run
 
 ```bash
+mkdir -p log
 java -jar epub-generator/target/epub-generator.jar
 ```
 
-The app loads `.env`, reads every `*.json` under `BOOK_DB`, and writes EPUB files to `EPUB_OUTPUT`. After all volumes finish, it prints a consolidated EpubCheck summary (fatal/error/warning totals and a reprint of every issue).
+The app loads `.env`, reads every `*.json` under `BOOK_DB`, and writes EPUB files to `EPUB_OUTPUT`. Application logs go to `log/run.log` (replaced each run). After all volumes finish, it writes a consolidated EpubCheck summary (fatal/error/warning totals and a reprint of every issue).
