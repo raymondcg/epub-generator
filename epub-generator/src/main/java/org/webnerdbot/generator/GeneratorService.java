@@ -124,12 +124,12 @@ public class GeneratorService {
         File epubFile = fileHelper.getEpub( epubFileName );
         if ( epubFile.isFile() ) {
             LocalDate epubDate = readEpubFileDate( epubFile );
-            if ( lastUpdated.isBefore( epubDate ) ) {
-                LOGGER.info( "{} ePub -- skipped; already exists (created/modified {}), lastUpdated {} is older",
+            if ( !lastUpdated.isAfter( epubDate ) ) {
+                LOGGER.info( "{} ePub -- skipped; already exists (last modified {}), lastUpdated {} is on or before",
                         bookTitle, epubDate.format( DATE_FORMAT ), lastUpdated.format( DATE_FORMAT ) );
-                return customReport;
+                return validateEpub( bookTitle, epubFileName, customReport, start );
             }
-            LOGGER.info( "{} ePub -- recreating; lastUpdated {} is on or after existing file date {}", bookTitle,
+            LOGGER.info( "{} ePub -- recreating; lastUpdated {} is after existing file date {}", bookTitle,
                     lastUpdated.format( DATE_FORMAT ), epubDate.format( DATE_FORMAT ) );
         }
 
@@ -159,7 +159,10 @@ public class GeneratorService {
         }
 
         LOGGER.info( "{} ePub -- created", bookTitle );
+        return validateEpub( bookTitle, epubFileName, customReport, start );
+    }
 
+    private CustomReport validateEpub( String bookTitle, String epubFileName, CustomReport customReport, Instant start ) {
         EpubCheck epubcheck = new EpubCheck( fileHelper.getEpub( epubFileName ), customReport );
 
         if ( epubcheck.validate() ) {
@@ -179,10 +182,7 @@ public class GeneratorService {
     private LocalDate readEpubFileDate( File epubFile ) {
         try {
             BasicFileAttributes attrs = Files.readAttributes( epubFile.toPath(), BasicFileAttributes.class );
-            FileTime fileTime = attrs.creationTime();
-            if ( fileTime == null || fileTime.toMillis() <= 0 ) {
-                fileTime = attrs.lastModifiedTime();
-            }
+            FileTime fileTime = attrs.lastModifiedTime();
             return fileTime.toInstant().atZone( ZoneId.systemDefault() ).toLocalDate();
         } catch ( IOException e ) {
             throw new UncheckedIOException( "Failed to read attributes for " + epubFile, e );
