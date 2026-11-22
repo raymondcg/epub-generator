@@ -19,6 +19,11 @@ public class Book {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate crawldate;
 
+    @JsonDeserialize(using = JsonDateDeserializer.class)
+    @JsonSerialize(using = JsonDateSerializer.class)
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate lastUpdated;
+
     private String id;
     private UUID uid = UUID.randomUUID();
     private String publisher;
@@ -119,6 +124,14 @@ public class Book {
         this.crawldate = crawldate;
     }
 
+    public LocalDate getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated( LocalDate lastUpdated ) {
+        this.lastUpdated = lastUpdated;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -137,8 +150,8 @@ public class Book {
 
     @Override
     public int hashCode() {
-        return Objects.hash( author, chapters, crawldate, description, editor, id, publisher, subject, title,
-                translator, uid );
+        return Objects.hash( author, chapters, crawldate, description, editor, id, lastUpdated, publisher, subject,
+                title, translator, uid );
     }
 
     @Override
@@ -153,9 +166,9 @@ public class Book {
         return Objects.equals( author, other.author ) && Objects.equals( chapters, other.chapters )
                 && Objects.equals( crawldate, other.crawldate ) && Objects.equals( description, other.description )
                 && Objects.equals( editor, other.editor ) && Objects.equals( id, other.id )
-                && Objects.equals( publisher, other.publisher ) && Objects.equals( subject, other.subject )
-                && Objects.equals( title, other.title ) && Objects.equals( translator, other.translator )
-                && Objects.equals( uid, other.uid );
+                && Objects.equals( lastUpdated, other.lastUpdated ) && Objects.equals( publisher, other.publisher )
+                && Objects.equals( subject, other.subject ) && Objects.equals( title, other.title )
+                && Objects.equals( translator, other.translator ) && Objects.equals( uid, other.uid );
     }
 
     @Override

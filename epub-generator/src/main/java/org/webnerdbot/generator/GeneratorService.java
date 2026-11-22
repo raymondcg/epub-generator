@@ -1,11 +1,16 @@
 package org.webnerdbot.generator;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +34,7 @@ import com.google.common.collect.Lists;
 public class GeneratorService {
 
     private static final Logger LOGGER = LogManager.getLogger( GeneratorService.class );
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
 
     private final ApplicationProperties applicationProperties;
     private final TemplateCreation templateCreation;
@@ -48,6 +54,7 @@ public class GeneratorService {
      */
     public int go() {
         int failures = 0;
+        List<CustomReport> allReports = new ArrayList<>();
         for ( String bookName : bookDao.getBookNames() ) {
             try {
                 Book book = bookDao.getBook( bookName );
@@ -57,6 +64,7 @@ public class GeneratorService {
                     continue;
                 }
                 List<CustomReport> reports = generate( book );
+                allReports.addAll( reports );
                 for ( CustomReport report : reports ) {
                     if ( report.getFatalErrorCount() > 0 || report.getErrorCount() > 0 ) {
                         failures++;
@@ -68,11 +76,13 @@ public class GeneratorService {
                 LOGGER.error( "Failed to generate EPUB for book {}.", bookName, e );
             }
         }
+        printEpubCheckSummary( allReports );
         return failures > 0 ? 1 : 0;
     }
 
     public List<CustomReport> generate( Book book ) {
         int chaptersPerVolume = applicationProperties.getChaptersPerVolume();
+        LocalDate lastUpdated = book.getLastUpdated() != null ? book.getLastUpdated() : LocalDate.now();
 
         List<Chapter> chapters = new ArrayList<>();
         if ( book.getChapters() != null ) {
@@ -92,24 +102,37 @@ public class GeneratorService {
                 String volumeTitle = String.format( "%s volume %s", book.getTitle(), i++ );
                 customReports.add( createEpub( subSetChapter, book.getCrawldate(), book.getBookIdString(), volumeTitle,
                         book.getAuthor(), book.getTranslator(), book.getEditor(), book.getPublisher(),
-                        book.getSubject(), book.getDescription() ) );
+                        book.getSubject(), book.getDescription(), lastUpdated ) );
             }
         } else {
             customReports.add( createEpub( chapters, book.getCrawldate(), book.getBookIdString(), book.getTitle(),
                     book.getAuthor(), book.getTranslator(), book.getEditor(), book.getPublisher(), book.getSubject(),
-                    book.getDescription() ) );
+                    book.getDescription(), lastUpdated ) );
         }
         return customReports;
     }
 
     private CustomReport createEpub( List<Chapter> chapters, LocalDate crawlDate, String bookIdString,
             String bookTitle, String author, String translator, String editor, String publisher, String subject,
-            String description ) {
+            String description, LocalDate lastUpdated ) {
         Instant start = Instant.now();
-        CustomReport customReport = new CustomReport( bookTitle.replace( " ", "" ).toLowerCase() );
+        String normalizedName = bookTitle.replace( " ", "" ).toLowerCase();
+        CustomReport customReport = new CustomReport( normalizedName );
         LOGGER.info( "{} ePub -- Started", bookTitle );
 
-        String epubFileName = bookTitle.replace( " ", "" ).toLowerCase() + ".epub";
+        String epubFileName = normalizedName + ".epub";
+        File epubFile = fileHelper.getEpub( epubFileName );
+        if ( epubFile.isFile() ) {
+            LocalDate epubDate = readEpubFileDate( epubFile );
+            if ( lastUpdated.isBefore( epubDate ) ) {
+                LOGGER.info( "{} ePub -- skipped; already exists (created/modified {}), lastUpdated {} is older",
+                        bookTitle, epubDate.format( DATE_FORMAT ), lastUpdated.format( DATE_FORMAT ) );
+                return customReport;
+            }
+            LOGGER.info( "{} ePub -- recreating; lastUpdated {} is on or after existing file date {}", bookTitle,
+                    lastUpdated.format( DATE_FORMAT ), epubDate.format( DATE_FORMAT ) );
+        }
+
         String coverFile = bookIdString + ".jpg";
 
         Map<String, String> zipContentsNotCompressed = new HashMap<>();
@@ -153,6 +176,41 @@ public class GeneratorService {
         return customReport;
     }
 
+    private LocalDate readEpubFileDate( File epubFile ) {
+        try {
+            BasicFileAttributes attrs = Files.readAttributes( epubFile.toPath(), BasicFileAttributes.class );
+            FileTime fileTime = attrs.creationTime();
+            if ( fileTime == null || fileTime.toMillis() <= 0 ) {
+                fileTime = attrs.lastModifiedTime();
+            }
+            return fileTime.toInstant().atZone( ZoneId.systemDefault() ).toLocalDate();
+        } catch ( IOException e ) {
+            throw new UncheckedIOException( "Failed to read attributes for " + epubFile, e );
+        }
+    }
+
+    private void printEpubCheckSummary( List<CustomReport> reports ) {
+        int fatal = 0;
+        int errors = 0;
+        int warnings = 0;
+        List<String> messages = new ArrayList<>();
+        for ( CustomReport report : reports ) {
+            fatal += report.getFatalErrorCount();
+            errors += report.getErrorCount();
+            warnings += report.getWarningCount();
+            messages.addAll( report.getCollectedMessages() );
+        }
+        LOGGER.info( "EpubCheck summary -- Fatal Errors {}, Errors {}, Warnings {}", fatal, errors, warnings );
+        if ( messages.isEmpty() ) {
+            LOGGER.info( "EpubCheck summary -- no EpubCheck issues" );
+            return;
+        }
+        LOGGER.info( "EpubCheck summary -- reprinting all issues:" );
+        for ( String message : messages ) {
+            LOGGER.error( message );
+        }
+    }
+
     private String getStyleSheet() {
         String styleSheet = "";
         try {
@@ -179,7 +237,7 @@ public class GeneratorService {
     private String createOpf( LocalDate crawlDate, String bookIdString, String title, String author, String publisher,
             String subject, String description, List<Chapter> chapters ) {
         LocalDate effectiveCrawlDate = crawlDate != null ? crawlDate : LocalDate.now();
-        String dateString = effectiveCrawlDate.format( DateTimeFormatter.ofPattern( "yyyy-MM-dd" ) );
+        String dateString = effectiveCrawlDate.format( DATE_FORMAT );
         String modifiedDate = LocalDateTime.now().format( DateTimeFormatter.ofPattern( "yyyy-MM-dd'T'HH:mm:ss'Z'" ) );
 
         Map<String, Object> input = new HashMap<>();
