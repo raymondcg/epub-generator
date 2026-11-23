@@ -4,8 +4,8 @@
     <Appenders>
         <File
             name="File"
-            fileName="log/run.log"
-            append="false">
+            fileName="log/run-${date:yyyy-MM-dd}.log"
+            append="true">
             <PatternLayout pattern="%date | %-5level | %threadName | %-55c{.1} | %message%n%throwable" />
         </File>
     </Appenders>

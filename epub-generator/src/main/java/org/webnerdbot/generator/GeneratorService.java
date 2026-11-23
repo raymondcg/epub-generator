@@ -112,9 +112,9 @@ public class GeneratorService {
         return customReports;
     }
 
-    private CustomReport createEpub( List<Chapter> chapters, LocalDate crawlDate, String bookIdString,
-            String bookTitle, String author, String translator, String editor, String publisher, String subject,
-            String description, LocalDate lastUpdated ) {
+    private CustomReport createEpub( List<Chapter> chapters, LocalDate crawlDate, String bookIdString, String bookTitle,
+            String author, String translator, String editor, String publisher, String subject, String description,
+            LocalDate lastUpdated ) {
         Instant start = Instant.now();
         String normalizedName = bookTitle.replace( " ", "" ).toLowerCase();
         CustomReport customReport = new CustomReport( normalizedName );
@@ -162,10 +162,11 @@ public class GeneratorService {
         return validateEpub( bookTitle, epubFileName, customReport, start );
     }
 
-    private CustomReport validateEpub( String bookTitle, String epubFileName, CustomReport customReport, Instant start ) {
+    private CustomReport validateEpub( String bookTitle, String epubFileName, CustomReport customReport,
+            Instant start ) {
         EpubCheck epubcheck = new EpubCheck( fileHelper.getEpub( epubFileName ), customReport );
 
-        if ( epubcheck.validate() ) {
+        if ( epubcheck.doValidate() == 0 ) {
             LOGGER.info( "{} ePub -- valid", bookTitle );
         } else {
             LOGGER.error( "{} ePub -- NOT valid", bookTitle );

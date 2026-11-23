@@ -30,8 +30,8 @@ public final class EnvLoader {
     public static void load() {
         Path envDir = findEnvDirectory();
         if ( envDir == null ) {
-            LOGGER.warn( "No {} found walking up from {}; relying on existing environment/system properties.",
-                    ENV_FILE, Paths.get( "" ).toAbsolutePath() );
+            LOGGER.warn( "No {} found walking up from {}; relying on existing environment/system properties.", ENV_FILE,
+                    Paths.get( "" ).toAbsolutePath() );
             return;
         }
 

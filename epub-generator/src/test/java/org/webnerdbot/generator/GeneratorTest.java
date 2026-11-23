@@ -41,7 +41,6 @@ import org.webnerdbot.model.Book;
 
 import freemarker.template.Configuration;
 import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.Version;
 
 @SpringBootTest(classes = Application.class)
 @ActiveProfiles("test")
@@ -96,6 +95,10 @@ public class GeneratorTest {
         assertEquals( 1, reports.size() );
         assertReportClean( reports.get( 0 ) );
         assertTrue( Files.exists( EPUB_DIR.resolve( "ancientgodlymonarch.epub" ) ) );
+
+        String toc = readEpubEntry( "ancientgodlymonarch.epub", "OEBPS/toc.xhtml" );
+        assertTrue( toc.contains( "content.xhtml#chapter_1" ) );
+        assertFalse( toc.contains( ">Chapter 1</a>" ) );
     }
 
     @DisplayName("go reads JSON from BOOK_DB and writes EPUB to EPUB_OUTPUT")
@@ -200,8 +203,8 @@ public class GeneratorTest {
         generatorService.generate( book );
 
         Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
-        FileTime older = FileTime.from( LocalDate.now().minusDays( 2 ).atStartOfDay( ZoneId.systemDefault() )
-                .toInstant() );
+        FileTime older = FileTime
+                .from( LocalDate.now().minusDays( 2 ).atStartOfDay( ZoneId.systemDefault() ).toInstant() );
         Files.setLastModifiedTime( epubPath, older );
         FileTime before = Files.getLastModifiedTime( epubPath );
 
@@ -236,7 +239,7 @@ public class GeneratorTest {
         setField( props, "chaptersPerVolume", chaptersPerVolume );
 
         FileHelper fileHelper = new FileHelper( props );
-        Configuration cfg = new Configuration( new Version( "2.3.23" ) );
+        Configuration cfg = new Configuration( Configuration.VERSION_2_3_35 );
         cfg.setClassForTemplateLoading( TemplateCreation.class, "/templates" );
         cfg.setDefaultEncoding( "UTF-8" );
         cfg.setLocale( Locale.US );
@@ -296,10 +299,14 @@ public class GeneratorTest {
     }
 
     private String readEpubContentSnippet( String epubFileName ) throws IOException {
+        return readEpubEntry( epubFileName, "OEBPS/content.xhtml" );
+    }
+
+    private String readEpubEntry( String epubFileName, String entryName ) throws IOException {
         File epub = EPUB_DIR.resolve( epubFileName ).toFile();
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile( epub )) {
-            java.util.zip.ZipEntry entry = zip.getEntry( "OEBPS/content.xhtml" );
-            assertTrue( entry != null );
+            java.util.zip.ZipEntry entry = zip.getEntry( entryName );
+            assertTrue( entry != null, "missing zip entry " + entryName );
             try (InputStream in = zip.getInputStream( entry )) {
                 return IOUtils.toString( in, StandardCharsets.UTF_8 );
             }

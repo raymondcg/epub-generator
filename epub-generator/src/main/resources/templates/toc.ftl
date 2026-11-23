@@ -15,9 +15,13 @@
 		<nav xmlns:epub="http://www.idpf.org/2007/ops" epub:type="toc"
 			id="toc">
 			<ol>
+				<li><a href="cover.xhtml">Cover</a></li>
 				<li class="toc-Preface-rw" id="toc-preface_001"><a
 					href="preface_001.xhtml">Key Contributors</a></li>
-				<li><a href="content.xhtml">Chapter 1</a></li>
+				<#list chapters as chapter>
+				<li><a href="content.xhtml#chapter_${chapter.number}">${chapter.number}:
+						${chapter.title?html}</a></li>
+				</#list>
 				<li><a href="copyright.xhtml">Copyright Page</a></li>
 			</ol>
 		</nav>
@@ -26,6 +30,7 @@
 			id="guide">
 			<h2>Guide</h2>
 			<ol>
+				<li><a epub:type="cover" href="cover.xhtml">Cover</a></li>
 				<li><a epub:type="toc" href="#toc">Table of Contents</a></li>
 				<li><a epub:type="bodymatter" href="content.xhtml">Begin
 						Reading</a></li>
