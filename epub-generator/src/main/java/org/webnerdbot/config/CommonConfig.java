@@ -12,7 +12,6 @@ import org.webnerdbot.generator.util.FileHelper;
 import org.webnerdbot.generator.util.TemplateCreation;
 
 import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.Version;
 
 @Configuration
 public class CommonConfig {
@@ -35,7 +34,8 @@ public class CommonConfig {
 
     @Bean
     public TemplateCreation templateCreation() {
-        freemarker.template.Configuration cfg = new freemarker.template.Configuration( new Version( "2.3.23" ) );
+        freemarker.template.Configuration cfg = new freemarker.template.Configuration(
+                freemarker.template.Configuration.VERSION_2_3_35 );
         cfg.setClassForTemplateLoading( TemplateCreation.class, "/templates" );
         cfg.setDefaultEncoding( "UTF-8" );
         cfg.setLocale( Locale.US );

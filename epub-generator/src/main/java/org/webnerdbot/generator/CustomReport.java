@@ -88,8 +88,8 @@ public class CustomReport extends MasterReport {
         // remove duplicate epub name from path and empty fileName variable
         fileName = epubFileName.endsWith( fileName ) ? "" : "/" + fileName;
         return String.format( "%1$s(%2$s): %3$s%4$s(%5$s,%6$s): %7$s", message.getSeverity(), message.getID(),
-                epubFileName, fileName, location.getLine(), location.getColumn(), fixMessage( args != null
-                        && args.length > 0 ? message.getMessage( args ) : message.getMessage() ) );
+                epubFileName, fileName, location.getLine(), location.getColumn(),
+                fixMessage( args != null && args.length > 0 ? message.getMessage( args ) : message.getMessage() ) );
     }
 
     @Override

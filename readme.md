@@ -22,6 +22,8 @@ Optional JSON field `lastUpdated` (`YYYY-MM-DD`): if present and on or before an
 
 ## Build
 
+Requires JDK 25+.
+
 ```bash
 mvn --batch-mode --errors --fail-at-end --show-version clean install
 ```

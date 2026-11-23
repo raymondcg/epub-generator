@@ -23,10 +23,11 @@
       <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
       <!-- Maven Plugins -->
-      <compiler.plugin.version>3.8.0</compiler.plugin.version>
-      <java.version>17</java.version>
-      <formatter.plugin.version>0.5.2</formatter.plugin.version>
-      <resources.plugin.version>2.7</resources.plugin.version>
+      <compiler.plugin.version>3.16.0</compiler.plugin.version>
+      <java.version>25</java.version>
+      <maven.compiler.release>${java.version}</maven.compiler.release>
+      <formatter.plugin.version>2.29.0</formatter.plugin.version>
+      <resources.plugin.version>3.5.0</resources.plugin.version>
 
    </properties>
 
@@ -41,17 +42,14 @@
                <artifactId>maven-compiler-plugin</artifactId>
                <version>${compiler.plugin.version}</version>
                <configuration>
-                  <compilerId>javac</compilerId>
-                  <source>${java.version}</source>
-                  <target>${java.version}</target>
-                  <compilerVersion>${java.version}</compilerVersion>
+                  <release>${java.version}</release>
                   <encoding>UTF-8</encoding>
                </configuration>
             </plugin>
 
             <!-- Code Formatting, on 'clean' goal -->
             <plugin>
-               <groupId>net.revelc.code</groupId>
+               <groupId>net.revelc.code.formatter</groupId>
                <artifactId>formatter-maven-plugin</artifactId>
                <version>${formatter.plugin.version}</version>
                <executions>
@@ -87,7 +85,7 @@
          </plugin>
          <!-- Code Formatting, on 'clean' goal -->
          <plugin>
-            <groupId>net.revelc.code</groupId>
+            <groupId>net.revelc.code.formatter</groupId>
             <artifactId>formatter-maven-plugin</artifactId>
          </plugin>
 

@@ -41,7 +41,6 @@ import org.webnerdbot.model.Book;
 
 import freemarker.template.Configuration;
 import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.Version;
 
 @SpringBootTest(classes = Application.class)
 @ActiveProfiles("test")
@@ -200,8 +199,8 @@ public class GeneratorTest {
         generatorService.generate( book );
 
         Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
-        FileTime older = FileTime.from( LocalDate.now().minusDays( 2 ).atStartOfDay( ZoneId.systemDefault() )
-                .toInstant() );
+        FileTime older = FileTime
+                .from( LocalDate.now().minusDays( 2 ).atStartOfDay( ZoneId.systemDefault() ).toInstant() );
         Files.setLastModifiedTime( epubPath, older );
         FileTime before = Files.getLastModifiedTime( epubPath );
 
@@ -236,7 +235,7 @@ public class GeneratorTest {
         setField( props, "chaptersPerVolume", chaptersPerVolume );
 
         FileHelper fileHelper = new FileHelper( props );
-        Configuration cfg = new Configuration( new Version( "2.3.23" ) );
+        Configuration cfg = new Configuration( Configuration.VERSION_2_3_35 );
         cfg.setClassForTemplateLoading( TemplateCreation.class, "/templates" );
         cfg.setDefaultEncoding( "UTF-8" );
         cfg.setLocale( Locale.US );
