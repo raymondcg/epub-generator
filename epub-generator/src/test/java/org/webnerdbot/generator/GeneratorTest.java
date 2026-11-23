@@ -95,6 +95,10 @@ public class GeneratorTest {
         assertEquals( 1, reports.size() );
         assertReportClean( reports.get( 0 ) );
         assertTrue( Files.exists( EPUB_DIR.resolve( "ancientgodlymonarch.epub" ) ) );
+
+        String toc = readEpubEntry( "ancientgodlymonarch.epub", "OEBPS/toc.xhtml" );
+        assertTrue( toc.contains( "content.xhtml#chapter_1" ) );
+        assertFalse( toc.contains( ">Chapter 1</a>" ) );
     }
 
     @DisplayName("go reads JSON from BOOK_DB and writes EPUB to EPUB_OUTPUT")
@@ -295,10 +299,14 @@ public class GeneratorTest {
     }
 
     private String readEpubContentSnippet( String epubFileName ) throws IOException {
+        return readEpubEntry( epubFileName, "OEBPS/content.xhtml" );
+    }
+
+    private String readEpubEntry( String epubFileName, String entryName ) throws IOException {
         File epub = EPUB_DIR.resolve( epubFileName ).toFile();
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile( epub )) {
-            java.util.zip.ZipEntry entry = zip.getEntry( "OEBPS/content.xhtml" );
-            assertTrue( entry != null );
+            java.util.zip.ZipEntry entry = zip.getEntry( entryName );
+            assertTrue( entry != null, "missing zip entry " + entryName );
             try (InputStream in = zip.getInputStream( entry )) {
                 return IOUtils.toString( in, StandardCharsets.UTF_8 );
             }

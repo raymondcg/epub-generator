@@ -18,7 +18,10 @@
 				<li><a href="cover.xhtml">Cover</a></li>
 				<li class="toc-Preface-rw" id="toc-preface_001"><a
 					href="preface_001.xhtml">Key Contributors</a></li>
-				<li><a href="content.xhtml">Chapter 1</a></li>
+				<#list chapters as chapter>
+				<li><a href="content.xhtml#chapter_${chapter.number}">${chapter.number}:
+						${chapter.title?html}</a></li>
+				</#list>
 				<li><a href="copyright.xhtml">Copyright Page</a></li>
 			</ol>
 		</nav>
