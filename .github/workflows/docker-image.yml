@@ -1,0 +1,59 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build smoke image
+        run: docker build -t epub-generator:smoke .
+
+      - name: Run container API smoke test
+        run: bash scripts/smoke-container.sh epub-generator:smoke
+
+  build:
+    runs-on: ubuntu-latest
+    needs: smoke
+    env:
+      REPOSITORY_NAME: ${{ github.event.repository.name }}
+      TAG_NAME: ${{ github.event_name == 'push' && 'latest' || format('pr-{0}', github.event.pull_request.number) }}
+      PUSH: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64, linux/arm64
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.REPOSITORY_NAME }}:${{ env.TAG_NAME }}
