@@ -45,6 +45,10 @@ public class GeneratorService {
      * the latest report for the book id.
      */
     public GenerationResult generateEpub( Book book, byte[] coverBytes ) {
+        return generateEpub( book, coverBytes, null );
+    }
+
+    public GenerationResult generateEpub( Book book, byte[] coverBytes, String coverContentType ) {
         if ( book == null ) {
             throw new IllegalArgumentException( "Book is required" );
         }
@@ -55,6 +59,8 @@ public class GeneratorService {
         if ( coverBytes == null || coverBytes.length == 0 ) {
             throw new IllegalArgumentException( "Cover image is required" );
         }
+
+        CoverFormat coverFormat = CoverFormat.from( coverContentType, coverBytes );
 
         List<Chapter> chapters = new ArrayList<>();
         if ( book.getChapters() != null ) {
@@ -69,7 +75,7 @@ public class GeneratorService {
         String title = book.getTitle() != null ? book.getTitle() : bookId;
         GenerationResult result = createEpub( chapters, book.getCrawldate(), bookId, title, book.getAuthor(),
                 book.getTranslator(), book.getEditor(), book.getPublisher(), book.getSubject(), book.getDescription(),
-                coverBytes );
+                coverBytes, coverFormat );
 
         customReportStore.put( bookId, new EpubCheckReportDto( bookId, result.report() ) );
         return result;
@@ -77,25 +83,28 @@ public class GeneratorService {
 
     private GenerationResult createEpub( List<Chapter> chapters, LocalDate crawlDate, String bookIdString,
             String bookTitle, String author, String translator, String editor, String publisher, String subject,
-            String description, byte[] coverBytes ) {
+            String description, byte[] coverBytes, CoverFormat coverFormat ) {
         Instant start = Instant.now();
         String normalizedName = bookTitle.replace( " ", "" ).toLowerCase();
+        if ( normalizedName.isBlank() ) {
+            normalizedName = bookIdString;
+        }
         CustomReport customReport = new CustomReport( normalizedName );
         LOGGER.info( "{} ePub -- Started", bookTitle );
 
         String epubFileName = normalizedName + ".epub";
-        String coverFileName = bookIdString + ".jpg";
+        String coverFileName = coverFormat.fileName( bookIdString );
 
         Map<String, String> zipContentsNotCompressed = new HashMap<>();
         zipContentsNotCompressed.put( "mimetype", "application/epub+zip" );
 
         Map<String, String> zipContentsCompress = new HashMap<>();
         zipContentsCompress.put( "META-INF/container.xml", createContainerXml() );
-        zipContentsCompress.put( "OEBPS/content.opf",
-                createOpf( crawlDate, bookIdString, bookTitle, author, publisher, subject, description, chapters ) );
+        zipContentsCompress.put( "OEBPS/content.opf", createOpf( crawlDate, bookIdString, bookTitle, author, publisher,
+                subject, description, chapters, coverFileName, coverFormat.getMediaType() ) );
         zipContentsCompress.put( "OEBPS/toc.xhtml", createTocHtml( chapters ) );
         zipContentsCompress.put( "OEBPS/css/style.css", getStyleSheet() );
-        zipContentsCompress.put( "OEBPS/cover.xhtml", createCoverHtml( bookTitle, author, bookIdString ) );
+        zipContentsCompress.put( "OEBPS/cover.xhtml", createCoverHtml( bookTitle, author, coverFileName ) );
         zipContentsCompress.put( "OEBPS/preface_001.xhtml", createPreface( author, translator, editor ) );
         zipContentsCompress.put( "OEBPS/copyright.xhtml", createCopyright( bookTitle, author ) );
         zipContentsCompress.put( "OEBPS/content.xhtml", createContent( bookTitle, chapters ) );
@@ -131,13 +140,11 @@ public class GeneratorService {
     }
 
     private String getStyleSheet() {
-        String styleSheet = "";
         try {
-            styleSheet = IOUtils.toString( this.getClass().getResourceAsStream( "/templates/style.css" ), "UTF-8" );
+            return IOUtils.toString( this.getClass().getResourceAsStream( "/templates/style.css" ), "UTF-8" );
         } catch ( IOException e ) {
-            LOGGER.error( "Problem reading the style.css file.", e );
+            throw new UncheckedIOException( "Problem reading the style.css file", e );
         }
-        return styleSheet;
     }
 
     private String createTocHtml( List<Chapter> chapters ) {
@@ -154,7 +161,7 @@ public class GeneratorService {
     }
 
     private String createOpf( LocalDate crawlDate, String bookIdString, String title, String author, String publisher,
-            String subject, String description, List<Chapter> chapters ) {
+            String subject, String description, List<Chapter> chapters, String coverFileName, String coverMediaType ) {
         LocalDate effectiveCrawlDate = crawlDate != null ? crawlDate : LocalDate.now();
         String dateString = effectiveCrawlDate.format( DATE_FORMAT );
         String modifiedDate = LocalDateTime.now().format( DateTimeFormatter.ofPattern( "yyyy-MM-dd'T'HH:mm:ss'Z'" ) );
@@ -168,14 +175,16 @@ public class GeneratorService {
         input.put( "crawldate", dateString );
         input.put( "modifieddate", modifiedDate );
         input.put( "description", description );
+        input.put( "coverFileName", coverFileName );
+        input.put( "coverMediaType", coverMediaType );
         return templateCreation.createString( input, "bookopf.ftl" );
     }
 
-    private String createCoverHtml( String title, String author, String bookIdString ) {
+    private String createCoverHtml( String title, String author, String coverFileName ) {
         Map<String, Object> input = new HashMap<>();
         input.put( "title", title );
         input.put( "author", author );
-        input.put( "bookId", bookIdString );
+        input.put( "coverFileName", coverFileName );
         return templateCreation.createString( input, "cover.ftl" );
     }
 

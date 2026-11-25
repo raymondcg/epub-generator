@@ -2,6 +2,7 @@ package org.webnerdbot.config;
 
 import java.util.Locale;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.webnerdbot.generator.CustomReportStore;
@@ -12,6 +13,7 @@ import org.webnerdbot.generator.util.TemplateCreation;
 import freemarker.template.TemplateExceptionHandler;
 
 @Configuration
+@EnableConfigurationProperties(ReportStoreProperties.class)
 public class CommonConfig {
 
     @Bean
@@ -26,8 +28,8 @@ public class CommonConfig {
     }
 
     @Bean
-    public CustomReportStore customReportStore() {
-        return new CustomReportStore();
+    public CustomReportStore customReportStore( ReportStoreProperties reportStoreProperties ) {
+        return new CustomReportStore( reportStoreProperties.getMaxEntries() );
     }
 
     @Bean

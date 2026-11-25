@@ -19,7 +19,7 @@
         <item id="toc" properties="nav" href="toc.xhtml" media-type="application/xhtml+xml"/>
         <item id="copyright" href="copyright.xhtml" media-type="application/xhtml+xml"/>
         <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
-        <item id="cover-image" properties="cover-image" href="images/${bookId}.jpg" media-type="image/jpeg"/>
+        <item id="cover-image" properties="cover-image" href="images/${coverFileName?html}" media-type="${coverMediaType?html}"/>
         <item id="style" href="css/style.css" media-type="text/css"/>
         <item id="xpreface_001" href="preface_001.xhtml" media-type="application/xhtml+xml"/>
         <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>

@@ -7,7 +7,7 @@
     </head>
 <body>
 	<div>
-		<img src="images/${bookId}.jpg" alt="Cover Image" title="Cover Image" />
+		<img src="images/${coverFileName?html}" alt="Cover Image" title="Cover Image" />
 	</div>
 </body>
 </html>

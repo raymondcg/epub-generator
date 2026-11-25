@@ -20,6 +20,24 @@ java -jar epub-generator/target/epub-generator-exec.jar
 
 Listens on port `8080`. Logs go to the console.
 
+## Configuration
+
+Defaults live in `epub-generator/src/main/resources/application.yml`:
+
+```yaml
+spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB      # max size per multipart part (book JSON or cover)
+      max-request-size: 55MB   # max size of the whole multipart request
+
+epub:
+  report-store:
+    max-entries: 100           # in-memory EpubCheck reports; oldest evicted when exceeded
+```
+
+Override via Spring external config or env (e.g. `SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE`, `EPUB_REPORT_STORE_MAX_ENTRIES`).
+
 ## Run (Podman)
 
 ```bash
@@ -47,11 +65,11 @@ Generate one EPUB. Multipart form:
 | Part | Content type | Description |
 |------|--------------|-------------|
 | `book` | `application/json` | Book document (see JSON structure below) |
-| `cover` | image (e.g. `image/jpeg`) | Cover image bytes |
+| `cover` | `image/jpeg` or `image/png` | Cover image bytes |
 
 **Success:** `200` with body `application/epub+zip` and `Content-Disposition: attachment; filename="<normalized-title>.epub"`. Also stores/replaces the EpubCheck report for `book.id`.
 
-**Errors:** `400` for missing parts, invalid JSON, or blank `id`; `500` for unexpected generation failures.
+**Errors:** `400` for missing parts, invalid JSON, blank `id`, or unsupported cover type; `413` if upload exceeds configured max sizes; `500` for unexpected generation failures.
 
 ```bash
 curl -sS -o out.epub -w "%{http_code}\n" \
@@ -72,7 +90,7 @@ curl -sS "http://localhost:8080/api/v1/epub/reports"
 curl -sS "http://localhost:8080/api/v1/epub/reports?bookId=ancientgodlymonarch"
 ```
 
-Reports are in-memory only (lost on restart). Only the latest report per book id is kept.
+Reports are in-memory only (lost on restart). Only the latest report per book id is kept. The store is capped by `epub.report-store.max-entries` (oldest entries evicted).
 
 ## Book JSON structure
 
@@ -96,7 +114,7 @@ Request `book` part maps to `Book` / `Chapter`:
       "id": "ch1",
       "chapterNumber": "1",
       "chapterTitle": "Chapter One",
-      "body": "<p>Chapter HTML body</p>",
+      "body": "Chapter text with newlines.",
       "url": "https://example.com/chapter/1"
     }
   ]
@@ -105,10 +123,10 @@ Request `book` part maps to `Book` / `Chapter`:
 
 | Field | Notes |
 |-------|--------|
-| `id` | Required for API; used as report key and cover entry name `{id}.jpg` |
+| `id` | Required for API; used as report key and cover entry name `{id}.jpg` or `{id}.png` |
 | `title` | Used for EPUB filename (`title` lowercased, spaces removed) |
 | `crawldate` / `lastUpdated` | `YYYY-MM-DD` |
-| `chapters[].body` | HTML; empty/null bodies are skipped |
+| `chapters[].body` | Chapter text; XML-escaped in the EPUB (`?html`); newlines become paragraph breaks. Empty/null bodies are skipped |
 | `chapters[].chapterNumber` / `chapterTitle` | JSON names for number and title |
 
 Volume splitting is not performed here; callers should send one volume per request.

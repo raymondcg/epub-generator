@@ -57,9 +57,10 @@ public class EpubController {
             throw new IllegalArgumentException( "Book id is required" );
         }
 
-        GenerationResult result = generatorService.generateEpub( book, cover.getBytes() );
+        GenerationResult result = generatorService.generateEpub( book, cover.getBytes(), cover.getContentType() );
+        String safeFileName = sanitizeFileName( result.epubFileName(), book.getId() );
         return ResponseEntity.ok().contentType( EPUB_MEDIA_TYPE )
-                .header( HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.epubFileName() + "\"" )
+                .header( HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFileName + "\"" )
                 .body( result.epubBytes() );
     }
 
@@ -71,5 +72,19 @@ public class EpubController {
         }
         return customReportStore.get( bookId ).<ResponseEntity<?>> map( ResponseEntity::ok )
                 .orElseGet( () -> ResponseEntity.status( HttpStatus.NOT_FOUND ).build() );
+    }
+
+    static String sanitizeFileName( String fileName, String fallbackBookId ) {
+        String sanitized = fileName == null ? ""
+                : fileName.replace( "\"", "" ).replace( "\r", "" ).replace( "\n", "" ).trim();
+        if ( sanitized.isBlank() || sanitized.equals( ".epub" ) ) {
+            String id = fallbackBookId == null ? "book"
+                    : fallbackBookId.replace( "\"", "" ).replace( "\r", "" ).replace( "\n", "" ).trim();
+            if ( id.isBlank() ) {
+                id = "book";
+            }
+            return id + ".epub";
+        }
+        return sanitized;
     }
 }
