@@ -2,10 +2,8 @@ package org.webnerdbot.generator.util;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.util.Map;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -13,9 +11,7 @@ import freemarker.template.TemplateException;
 
 public class TemplateCreation {
 
-    private static final Logger LOGGER = LogManager.getLogger( TemplateCreation.class );
-
-    private Configuration cfg;
+    private final Configuration cfg;
 
     public TemplateCreation( Configuration cfg ) {
         this.cfg = cfg;
@@ -27,10 +23,9 @@ public class TemplateCreation {
             template.process( input, stringWriter );
             return stringWriter.toString();
         } catch ( IOException e ) {
-            LOGGER.error( "Error Processing Template {}", templateName, e );
+            throw new UncheckedIOException( "Error processing template " + templateName, e );
         } catch ( TemplateException e ) {
-            LOGGER.error( "Error Processing Template {}", templateName, e );
+            throw new IllegalStateException( "Error processing template " + templateName, e );
         }
-        return "";
     }
 }

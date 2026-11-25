@@ -2,11 +2,10 @@ package org.webnerdbot.config;
 
 import java.util.Locale;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.webnerdbot.dao.DataAccess;
-import org.webnerdbot.dao.file.BookDao;
-import org.webnerdbot.dao.file.DataAccessImpl;
+import org.webnerdbot.generator.CustomReportStore;
 import org.webnerdbot.generator.GeneratorService;
 import org.webnerdbot.generator.util.FileHelper;
 import org.webnerdbot.generator.util.TemplateCreation;
@@ -14,22 +13,23 @@ import org.webnerdbot.generator.util.TemplateCreation;
 import freemarker.template.TemplateExceptionHandler;
 
 @Configuration
+@EnableConfigurationProperties(ReportStoreProperties.class)
 public class CommonConfig {
 
     @Bean
-    public GeneratorService generatorService( ApplicationProperties applicationProperties,
-            TemplateCreation templateCreation, FileHelper fileHelper, BookDao bookDao ) {
-        return new GeneratorService( applicationProperties, templateCreation, fileHelper, bookDao );
+    public GeneratorService generatorService( TemplateCreation templateCreation, FileHelper fileHelper,
+            CustomReportStore customReportStore ) {
+        return new GeneratorService( templateCreation, fileHelper, customReportStore );
     }
 
     @Bean
-    public FileHelper fileHelper( ApplicationProperties applicationProperties ) {
-        return new FileHelper( applicationProperties );
+    public FileHelper fileHelper() {
+        return new FileHelper();
     }
 
     @Bean
-    public DataAccess dataAccess() {
-        return new DataAccessImpl();
+    public CustomReportStore customReportStore( ReportStoreProperties reportStoreProperties ) {
+        return new CustomReportStore( reportStoreProperties.getMaxEntries() );
     }
 
     @Bean
@@ -41,10 +41,5 @@ public class CommonConfig {
         cfg.setLocale( Locale.US );
         cfg.setTemplateExceptionHandler( TemplateExceptionHandler.RETHROW_HANDLER );
         return new TemplateCreation( cfg );
-    }
-
-    @Bean
-    public BookDao bookDao( DataAccess dataAccess, ApplicationProperties applicationProperties ) {
-        return new BookDao( dataAccess, applicationProperties );
     }
 }

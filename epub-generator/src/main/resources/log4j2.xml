@@ -2,17 +2,16 @@
 <!DOCTYPE Configuration>
 <Configuration monitorInterval="30">
     <Appenders>
-        <File
-            name="File"
-            fileName="log/run-${date:yyyy-MM-dd}.log"
-            append="true">
+        <Console
+            name="Console"
+            target="SYSTEM_OUT">
             <PatternLayout pattern="%date | %-5level | %threadName | %-55c{.1} | %message%n%throwable" />
-        </File>
+        </Console>
     </Appenders>
 
     <Loggers>
         <Root level="INFO">
-            <AppenderRef ref="File" />
+            <AppenderRef ref="Console" />
         </Root>
 
         <Logger

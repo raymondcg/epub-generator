@@ -27,8 +27,6 @@
 		<commons-io.version>2.22.0</commons-io.version>
 		<commons-text.version>1.15.0</commons-text.version>
 		<epubcheck.version>5.4.0</epubcheck.version>
-		<dotenv-java.version>3.2.0</dotenv-java.version>
-		<guava.version>33.8.0-jre</guava.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -78,17 +76,6 @@
 				<version>${epubcheck.version}</version>
 			</dependency>
 
-			<dependency>
-				<groupId>io.github.cdimascio</groupId>
-				<artifactId>dotenv-java</artifactId>
-				<version>${dotenv-java.version}</version>
-			</dependency>
-
-			<dependency>
-				<groupId>com.google.guava</groupId>
-				<artifactId>guava</artifactId>
-				<version>${guava.version}</version>
-			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -160,6 +147,7 @@
 					<version>${spring.boot.version}</version>
 					<configuration>
 						<executable>true</executable>
+						<classifier>exec</classifier>
 					</configuration>
 					<executions>
 						<execution>

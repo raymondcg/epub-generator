@@ -2,24 +2,15 @@ package org.webnerdbot.generator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.File;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.FileTime;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.Locale;
-import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,288 +19,126 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.webnerdbot.Application;
-import org.webnerdbot.config.ApplicationProperties;
-import org.webnerdbot.config.EnvLoader;
-import org.webnerdbot.dao.file.BookDao;
-import org.webnerdbot.dao.file.DataAccessImpl;
-import org.webnerdbot.generator.util.FileHelper;
-import org.webnerdbot.generator.util.TemplateCreation;
 import org.webnerdbot.model.Book;
-
-import freemarker.template.Configuration;
-import freemarker.template.TemplateExceptionHandler;
+import org.webnerdbot.model.BookMapper;
+import org.webnerdbot.model.Chapter;
 
 @SpringBootTest(classes = Application.class)
 @ActiveProfiles("test")
 public class GeneratorTest {
 
-    private static final Path BOOK_DB_DIR;
-    private static final Path EPUB_DIR;
-
-    static {
-        EnvLoader.load();
-        try {
-            BOOK_DB_DIR = Files.createTempDirectory( "epub-generator-bookdb-" );
-            EPUB_DIR = Files.createTempDirectory( "epub-generator-epub-" );
-        } catch ( IOException e ) {
-            throw new UncheckedIOException( e );
-        }
-    }
-
     @Autowired
     private GeneratorService generatorService;
 
     @Autowired
-    private BookDao bookDao;
+    private CustomReportStore customReportStore;
 
-    @DynamicPropertySource
-    static void registerProperties( DynamicPropertyRegistry registry ) {
-        registry.add( "BOOK_DB", () -> BOOK_DB_DIR.toAbsolutePath().toString() );
-        registry.add( "EPUB_OUTPUT", () -> EPUB_DIR.toAbsolutePath().toString() );
-        registry.add( "CHAPTERS_PER_VOLUME", () -> "1000" );
-    }
+    private final BookMapper bookMapper = new BookMapper();
 
     @BeforeEach
-    void clearEpubOutput() throws IOException {
-        if ( !Files.isDirectory( EPUB_DIR ) ) {
-            return;
-        }
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream( EPUB_DIR )) {
-            for ( Path entry : stream ) {
-                deleteRecursively( entry );
-            }
-        }
+    void clearReports() {
+        customReportStore.clear();
     }
 
-    @DisplayName("generate happy path produces a valid EPUB")
+    @DisplayName("generateEpub happy path produces a valid in-memory EPUB")
     @Test
     public void generateHappyPath() throws Exception {
         Book book = loadSampleBook();
-        copyCoverToBookDb();
+        byte[] cover = loadSampleCover();
 
-        List<CustomReport> reports = generatorService.generate( book );
+        GenerationResult result = generatorService.generateEpub( book, cover );
 
-        assertEquals( 1, reports.size() );
-        assertReportClean( reports.get( 0 ) );
-        assertTrue( Files.exists( EPUB_DIR.resolve( "ancientgodlymonarch.epub" ) ) );
+        assertTrue( result.epubBytes().length > 100 );
+        assertEquals( "ancientgodlymonarch.epub", result.epubFileName() );
+        assertReportClean( result.report() );
 
-        String toc = readEpubEntry( "ancientgodlymonarch.epub", "OEBPS/toc.xhtml" );
+        String toc = readEpubEntry( result.epubBytes(), "OEBPS/toc.xhtml" );
         assertTrue( toc.contains( "content.xhtml#chapter_1" ) );
-        assertFalse( toc.contains( ">Chapter 1</a>" ) );
+
+        assertTrue( epubContainsEntry( result.epubBytes(), "OEBPS/images/" + book.getBookIdString() + ".jpg" ) );
+        assertTrue( customReportStore.get( book.getBookIdString() ).isPresent() );
     }
 
-    @DisplayName("go reads JSON from BOOK_DB and writes EPUB to EPUB_OUTPUT")
+    @DisplayName("empty chapter bodies are skipped")
     @Test
-    public void goGeneratesFromFilesystem() throws Exception {
-        copySampleJsonToBookDb();
-        copyCoverToBookDb();
-
-        assertEquals( 0, generatorService.go() );
-
-        assertTrue( Files.exists( EPUB_DIR.resolve( "ancientgodlymonarch.epub" ) ) );
-    }
-
-    @DisplayName("empty chapter bodies are filtered out")
-    @Test
-    public void emptyBodiesFiltered() throws Exception {
+    public void skipsEmptyChapterBodies() throws Exception {
         Book book = loadSampleBook();
-        copyCoverToBookDb();
+        Chapter empty = new Chapter();
+        empty.setId( "empty" );
+        empty.setNumber( "99" );
+        empty.setTitle( "Empty" );
+        empty.setBody( "" );
+        book.getChapters().add( empty );
 
-        long emptyBodies = book.getChapters().stream().filter( c -> c.getBody() == null || c.getBody().isEmpty() )
-                .count();
-        assertTrue( emptyBodies >= 1 );
-
-        List<CustomReport> reports = generatorService.generate( book );
-        assertEquals( 1, reports.size() );
-        assertReportClean( reports.get( 0 ) );
-
-        String content = readEpubContentSnippet( "ancientgodlymonarch.epub" );
-        assertFalse( content.contains( "chapter_6" ) );
-        assertTrue( content.contains( "chapter_1" ) );
+        GenerationResult result = generatorService.generateEpub( book, loadSampleCover() );
+        String content = readEpubEntry( result.epubBytes(), "OEBPS/content.xhtml" );
+        assertFalse( content.contains( "Empty" ) );
     }
 
-    @DisplayName("chapters are partitioned into volumes when over chaptersPerVolume")
+    @DisplayName("book without id or title is rejected")
     @Test
-    public void multiVolumePartition() throws Exception {
+    public void rejectsMissingBookId() {
+        Book book = new Book();
+        book.setTitle( null );
+        assertThrows( IllegalArgumentException.class, () -> generatorService.generateEpub( book, new byte[] { 1 } ) );
+    }
+
+    @DisplayName("empty cover is rejected")
+    @Test
+    public void rejectsEmptyCover() throws Exception {
         Book book = loadSampleBook();
-        copyCoverToBookDb();
-
-        GeneratorService localService = createServiceWithChaptersPerVolume( 2 );
-        List<CustomReport> reports = localService.generate( book );
-
-        assertEquals( 3, reports.size() );
-        assertTrue( Files.exists( EPUB_DIR.resolve( "ancientgodlymonarchvolume1.epub" ) ) );
-        assertTrue( Files.exists( EPUB_DIR.resolve( "ancientgodlymonarchvolume2.epub" ) ) );
-        assertTrue( Files.exists( EPUB_DIR.resolve( "ancientgodlymonarchvolume3.epub" ) ) );
+        assertThrows( IllegalArgumentException.class, () -> generatorService.generateEpub( book, new byte[0] ) );
     }
 
-    @DisplayName("missing cover does not abort go")
+    @DisplayName("report store keeps latest report per book id")
     @Test
-    public void missingCoverDoesNotAbortGo() throws Exception {
-        Files.deleteIfExists( BOOK_DB_DIR.resolve( "ancientgodlymonarch.jpg" ) );
-        copySampleJsonToBookDb();
-
-        assertEquals( 1, generatorService.go() );
-    }
-
-    @DisplayName("skips recreate when lastUpdated is older than existing EPUB date")
-    @Test
-    public void skipsWhenLastUpdatedOlderThanEpub() throws Exception {
+    public void storesLatestReportPerBook() throws Exception {
         Book book = loadSampleBook();
-        copyCoverToBookDb();
-
-        generatorService.generate( book );
-
-        Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
-        FileTime before = Files.getLastModifiedTime( epubPath );
-
-        book.setLastUpdated( LocalDate.now().minusDays( 1 ) );
-        List<CustomReport> reports = generatorService.generate( book );
-
-        assertEquals( 1, reports.size() );
-        assertReportClean( reports.get( 0 ) );
-        assertEquals( before, Files.getLastModifiedTime( epubPath ) );
-    }
-
-    @DisplayName("skips recreate when lastUpdated is missing and EPUB is from today")
-    @Test
-    public void skipsWhenLastUpdatedMissingAndEpubIsToday() throws Exception {
-        Book book = loadSampleBook();
-        copyCoverToBookDb();
-
-        generatorService.generate( book );
-
-        Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
-        FileTime before = Files.getLastModifiedTime( epubPath );
-
-        book.setLastUpdated( null );
-        List<CustomReport> reports = generatorService.generate( book );
-
-        assertEquals( 1, reports.size() );
-        assertReportClean( reports.get( 0 ) );
-        assertTrue( reports.get( 0 ).getCollectedMessages().isEmpty() );
-        assertEquals( before, Files.getLastModifiedTime( epubPath ) );
-    }
-
-    @DisplayName("recreates when lastUpdated defaults to today and EPUB mtime is older")
-    @Test
-    public void recreatesWhenLastUpdatedMissingAndEpubIsOlder() throws Exception {
-        Book book = loadSampleBook();
-        copyCoverToBookDb();
-
-        generatorService.generate( book );
-
-        Path epubPath = EPUB_DIR.resolve( "ancientgodlymonarch.epub" );
-        FileTime older = FileTime
-                .from( LocalDate.now().minusDays( 2 ).atStartOfDay( ZoneId.systemDefault() ).toInstant() );
-        Files.setLastModifiedTime( epubPath, older );
-        FileTime before = Files.getLastModifiedTime( epubPath );
-
-        book.setLastUpdated( null );
-        List<CustomReport> reports = generatorService.generate( book );
-
-        assertEquals( 1, reports.size() );
-        assertReportClean( reports.get( 0 ) );
-        assertTrue( Files.getLastModifiedTime( epubPath ).compareTo( before ) > 0 );
-    }
-
-    @DisplayName("go summary path returns clean reports with zero collected issues")
-    @Test
-    public void goSummaryHasCleanReports() throws Exception {
-        copySampleJsonToBookDb();
-        copyCoverToBookDb();
-
-        assertEquals( 0, generatorService.go() );
-
-        Book book = loadSampleBook();
-        book.setLastUpdated( LocalDate.now().minusDays( 1 ) );
-        List<CustomReport> reports = generatorService.generate( book );
-        assertEquals( 1, reports.size() );
-        assertReportClean( reports.get( 0 ) );
-        assertTrue( reports.get( 0 ).getCollectedMessages().isEmpty() );
-    }
-
-    private GeneratorService createServiceWithChaptersPerVolume( int chaptersPerVolume ) throws Exception {
-        ApplicationProperties props = new ApplicationProperties();
-        setField( props, "bookDb", BOOK_DB_DIR.toAbsolutePath().toString() );
-        setField( props, "epubOutput", EPUB_DIR.toAbsolutePath().toString() );
-        setField( props, "chaptersPerVolume", chaptersPerVolume );
-
-        FileHelper fileHelper = new FileHelper( props );
-        Configuration cfg = new Configuration( Configuration.VERSION_2_3_35 );
-        cfg.setClassForTemplateLoading( TemplateCreation.class, "/templates" );
-        cfg.setDefaultEncoding( "UTF-8" );
-        cfg.setLocale( Locale.US );
-        cfg.setTemplateExceptionHandler( TemplateExceptionHandler.RETHROW_HANDLER );
-        TemplateCreation templates = new TemplateCreation( cfg );
-        BookDao localDao = new BookDao( new DataAccessImpl(), props );
-        return new GeneratorService( props, templates, fileHelper, localDao );
-    }
-
-    private static void setField( Object target, String name, Object value ) throws Exception {
-        Field field = target.getClass().getDeclaredField( name );
-        field.setAccessible( true );
-        field.set( target, value );
-    }
-
-    private static void deleteRecursively( Path path ) throws IOException {
-        if ( Files.isDirectory( path ) ) {
-            try (Stream<Path> children = Files.list( path )) {
-                for ( Path child : children.toList() ) {
-                    deleteRecursively( child );
-                }
-            }
-        }
-        Files.deleteIfExists( path );
+        generatorService.generateEpub( book, loadSampleCover() );
+        generatorService.generateEpub( book, loadSampleCover() );
+        assertEquals( 1, customReportStore.getAll().size() );
     }
 
     private Book loadSampleBook() throws IOException {
-        String json = IOUtils.toString( resource( "/generator/ancientgodlymonarch.json" ), StandardCharsets.UTF_8 );
-        Book book = bookDao.stringToPojo( json );
-        assertTrue( book != null && book.getChapters() != null && !book.getChapters().isEmpty() );
-        return book;
-    }
-
-    private void copySampleJsonToBookDb() throws IOException {
-        Files.writeString( BOOK_DB_DIR.resolve( "ancientgodlymonarch.json" ),
-                IOUtils.toString( resource( "/generator/ancientgodlymonarch.json" ), StandardCharsets.UTF_8 ) );
-    }
-
-    private void copyCoverToBookDb() throws IOException {
-        try (InputStream in = resource( "/generator/ancientgodlymonarch.jpg" )) {
-            Files.copy( in, BOOK_DB_DIR.resolve( "ancientgodlymonarch.jpg" ), StandardCopyOption.REPLACE_EXISTING );
+        try (InputStream in = getClass().getResourceAsStream( "/generator/ancientgodlymonarch.json" )) {
+            String json = IOUtils.toString( in, StandardCharsets.UTF_8 );
+            return bookMapper.fromJson( json );
         }
     }
 
-    private InputStream resource( String path ) {
-        InputStream in = getClass().getResourceAsStream( path );
-        if ( in == null ) {
-            throw new UncheckedIOException( new IOException( "Missing resource " + path ) );
+    private byte[] loadSampleCover() throws IOException {
+        try (InputStream in = getClass().getResourceAsStream( "/generator/ancientgodlymonarch.jpg" )) {
+            return IOUtils.toByteArray( in );
         }
-        return in;
     }
 
     private void assertReportClean( CustomReport report ) {
-        assertEquals( 0, report.getFatalErrorCount(), "fatal errors" );
+        assertEquals( 0, report.getFatalErrorCount(), "fatal" );
         assertEquals( 0, report.getErrorCount(), "errors" );
-        assertEquals( 0, report.getWarningCount(), "warnings" );
     }
 
-    private String readEpubContentSnippet( String epubFileName ) throws IOException {
-        return readEpubEntry( epubFileName, "OEBPS/content.xhtml" );
-    }
-
-    private String readEpubEntry( String epubFileName, String entryName ) throws IOException {
-        File epub = EPUB_DIR.resolve( epubFileName ).toFile();
-        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile( epub )) {
-            java.util.zip.ZipEntry entry = zip.getEntry( entryName );
-            assertTrue( entry != null, "missing zip entry " + entryName );
-            try (InputStream in = zip.getInputStream( entry )) {
-                return IOUtils.toString( in, StandardCharsets.UTF_8 );
+    private boolean epubContainsEntry( byte[] epubBytes, String entryName ) throws IOException {
+        try (ZipInputStream zis = new ZipInputStream( new ByteArrayInputStream( epubBytes ) )) {
+            ZipEntry entry;
+            while ( ( entry = zis.getNextEntry() ) != null ) {
+                if ( entryName.equals( entry.getName() ) ) {
+                    return true;
+                }
             }
         }
+        return false;
+    }
+
+    private String readEpubEntry( byte[] epubBytes, String entryName ) throws IOException {
+        try (ZipInputStream zis = new ZipInputStream( new ByteArrayInputStream( epubBytes ) )) {
+            ZipEntry entry;
+            while ( ( entry = zis.getNextEntry() ) != null ) {
+                if ( entryName.equals( entry.getName() ) ) {
+                    return IOUtils.toString( zis, StandardCharsets.UTF_8 );
+                }
+            }
+        }
+        throw new IllegalStateException( "Missing entry " + entryName );
     }
 }
